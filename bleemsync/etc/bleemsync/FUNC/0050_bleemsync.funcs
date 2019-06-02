@@ -23,6 +23,10 @@
 ###############################################################################
 ### LOCAL FUNCTIONS ###########################################################
 ###############################################################################
+
+pb_currentdbfile="regional.db"
+pb_currentidfolder="10"
+
 kill_ui_programs(){
   killall -s TERM sdl_display &> "/dev/null"
   killall -s KILL showLogo sonyapp ui_menu auto_dimmer pcsx &> "/dev/null"
@@ -240,12 +244,20 @@ setup_StockUI() {
 
   end=$(date +%s%N)
   echo "[BLEEMSYNC](PROFILE) BleemSync tmpfs mounting took: $(((end-start)/1000000))ms to execute"
+  
+  if [ -f "/var/volatile/pb_folder.flag" ]; then
+	source "/var/volatile/pb_folder.flag"
+	echo "[PB](info) pb_folder.flag found: $pb_currentdbfile"
+  else
+	echo "[PB](info) pb_folder.flag not found: default folder"
+  fi
+  
 #-----------------------------------------------------------------------------#
   start=$(date +%s%N)
 
   # Create gaadata on tmpfs
   mkdir -p "${VOL_GAADATA}/databases/"
-  cp -f "$bleemsync_path/etc/bleemsync/SYS/databases/regional.db" "${VOL_GAADATA}/databases/"
+  cp -f "$bleemsync_path/etc/bleemsync/SYS/databases/$pb_currentdbfile" "${VOL_GAADATA}/databases/regional.db"
 
   ln -s /gaadata/geninfo "${VOL_GAADATA}"
   ln -s /gaadata/preferences "${VOL_GAADATA}"
@@ -257,7 +269,7 @@ setup_StockUI() {
 
   # Link games on /mountpoint
   if [ -d "$mountpoint/games" ]; then
-    media_game_ids=(`"$bleemsync_path/bin/sqlite3" "$bleemsync_path/etc/bleemsync/SYS/databases/regional.db" -cmd "SELECT GAME_ID FROM MENU_ENTRIES" ".quit"`)
+    media_game_ids=(`"$bleemsync_path/bin/sqlite3" "$bleemsync_path/etc/bleemsync/SYS/databases/$pb_currentdbfile" -cmd "SELECT GAME_ID FROM MENU_ENTRIES" ".quit"`)
     for game in "${media_game_ids[@]}"; do
       ln -s "${mountpoint}/games/${game}/" "${VOL_GAADATA}"
       ln -s "${mountpoint}/games/${game}/" "${VOL_DATAPCSX}"
@@ -280,7 +292,7 @@ setup_StockUI() {
   echo "[BLEEMSYNC](PROFILE) BleemSync tmpfs sym linking and processing took: $(((end-start)/1000000))ms to execute"
 #-----------------------------------------------------------------------------#
   # Unite EMMC and MEDIA games and databases
-  if [ "$link_EMMC_and_USB" = "1" ]; then
+  if [ "$link_EMMC_and_USB" = "1" ] && [ "$pb_currentidfolder" = "10" ] ; then
     start=$(date +%s%N)
 
     emmc_gaadata_count=`"$bleemsync_path/bin/sqlite3" "/gaadata/databases/regional.db" -cmd "SELECT GAME_ID FROM GAME ORDER BY GAME_ID DESC LIMIT 1" ".quit"`
@@ -326,27 +338,35 @@ setup_StockUI() {
     for launcher in "$bleemsync_path/etc/bleemsync/SUP/launchers/"*; do
       if [ -d "$launcher" ]; then
         if [ -f "$launcher/launcher.cfg" ]; then
+          pb_parentfolder="-1"
+		  pb_idfolder="-99"
           source "$bleemsync_path/etc/bleemsync/SUP/scripts/launcher_reset.cfg"
           source "$launcher/launcher.cfg"
           if [[ -z $launcher_filename || -z $launcher_title ]]; then
             echo "[BLEEMSYNC](ERROR) launcher.cfg for $launcher is missing required variables launcher_filename and/or launcher_title"
           else
-            # Only permit A-Z,1-9 to prevent characters which may break SQL insert
-            launcher_filename=`echo $launcher_filename | sed -e "s/[^ A-Za-z0-9]//g"`
-            launcher_title=`echo $launcher_title | sed -e "s/[^ A-Za-z0-9]//g"`
-            launcher_publisher=`echo $launcher_publisher | sed -e "s/[^ A-Za-z0-9]//g"`
-            launcher_year=`echo $launcher_year | sed -e "s/[^ A-Za-z0-9]//g"`
-            if [ "$launcher_sort" = "no" ]; then
-              launcher_sort="$last_position"
-            else
-              launcher_sort="0"
-            fi
-            let total_count++
-            echo "INSERT INTO DISC VALUES(NULL,$total_count,1,'$launcher_filename');" >> "/tmp/launcher.sql"
-            echo "INSERT INTO MENU_ENTRIES VALUES($total_count,'$launcher_title','$launcher_publisher',$launcher_year,1,'CERO_A','QR_CODE_GM',NULL,$launcher_sort);" >> "/tmp/launcher.sql"
-            ln -s "$launcher" "${VOL_GAADATA}/$total_count"
-            ln -s "$launcher" "${VOL_DATAPCSX}/$total_count"
-            echo "[BLEEMSYNC](INFO) launcher loaded: $launcher"
+			pb_hundredtest="$(($pb_currentidfolder-($pb_currentidfolder%100)))"
+			if [ "$pb_parentfolder" = "$pb_currentidfolder" ] || [ "$pb_parentfolder" = "-1" ] || [ "$pb_hundredtest" = "$pb_parentfolder" ]; then
+				if [ "$pb_idfolder" != "$pb_currentidfolder" ]; then
+					# Only permit A-Z,1-9 to prevent characters which may break SQL insert
+					launcher_filename=`echo $launcher_filename | sed -e "s/[^ A-Za-z0-9]//g"`
+					launcher_title=`echo $launcher_title | sed -e "s/[^,-_\.' A-Za-z0-9]//g"`
+					launcher_title=`echo $launcher_title | sed -e "s/'/''/g"`
+					launcher_publisher=`echo $launcher_publisher | sed -e "s/[^ A-Za-z0-9]//g"`
+					launcher_year=`echo $launcher_year | sed -e "s/[^ A-Za-z0-9]//g"`
+					if [ "$launcher_sort" = "no" ]; then
+					  launcher_sort="$last_position"
+					else
+					  launcher_sort="0"
+					fi
+					let total_count++
+					echo "INSERT INTO DISC VALUES(NULL,$total_count,1,'$launcher_filename');" >> "/tmp/launcher.sql"
+					echo "INSERT INTO MENU_ENTRIES VALUES($total_count,'$launcher_title','$launcher_publisher',$launcher_year,1,'CERO_A','QR_CODE_GM',NULL,$launcher_sort);" >> "/tmp/launcher.sql"
+					ln -s "$launcher" "${VOL_GAADATA}/$total_count"
+					ln -s "$launcher" "${VOL_DATAPCSX}/$total_count"
+					echo "[BLEEMSYNC](INFO) launcher loaded: $launcher"
+				fi
+			fi
           fi
         fi
       fi
@@ -381,8 +401,8 @@ execute_bleemsync_func(){
     mkdir -p "$bleemsync_path/etc/bleemsync/SYS"
     cp -rf "$old_system_dir/"* "$bleemsync_path/etc/bleemsync/SYS/"
     rm -r "$old_system_dir"
-    if [ -f "$bleemsync_path/etc/bleemsync/SYS/databases/regional.db" ]; then
-      "$bleemsync_path/bin/sqlite3" "$bleemsync_path/etc/bleemsync/SYS/databases/regional.db" < \
+    if [ -f "$bleemsync_path/etc/bleemsync/SYS/databases/$pb_currentdbfile" ]; then
+      "$bleemsync_path/bin/sqlite3" "$bleemsync_path/etc/bleemsync/SYS/databases/$pb_currentdbfile" < \
         "$bleemsync_path/etc/bleemsync/SUP/scripts/migrate_pre10_db.sql"
     fi
     end=$(date +%s%N)
@@ -398,8 +418,8 @@ execute_bleemsync_func(){
     cp "$bleemsync_path/etc/bleemsync/SUP/scripts/system.pre" "$bleemsync_path/etc/bleemsync/CFG"
   
   # Check if this is a new install
-  if [ ! -f "$bleemsync_path/etc/bleemsync/SYS/databases/regional.db" ]; then
-    echo "[BLEEMSYNC](INFO) $bleemsync_path/etc/bleemsync/SYS/databases/regional.db does NOT EXIST"
+  if [ ! -f "$bleemsync_path/etc/bleemsync/SYS/databases/$pb_currentdbfile" ]; then
+    echo "[BLEEMSYNC](INFO) $bleemsync_path/etc/bleemsync/SYS/databases/$pb_currentdbfile does NOT EXIST"
     echo "[BLEEMSYNC](INFO) This may be a new install. Creating databases folder"
     mkdir -p "$bleemsync_path/etc/bleemsync/SYS/databases"
   fi
@@ -431,7 +451,7 @@ execute_bleemsync_func(){
     start=$(date +%s%N)
     
     mkdir -p "$retroarch_path/.config/retroarch/playlists" "$retroarch_path/.config/retroarch/thumbnails/PlayStation Classic - External"
-    "$bleemsync_path/bin/lpl_generator" "$bleemsync_path/etc/bleemsync/SYS/databases/regional.db" "$retroarch_path/.config/retroarch/playlists/PlayStation Classic - External.lpl" "$mountpoint/games" "/tmp/ra_playlist_thumbnails"
+    "$bleemsync_path/bin/lpl_generator" "$bleemsync_path/etc/bleemsync/SYS/databases/$pb_currentdbfile" "$retroarch_path/.config/retroarch/playlists/PlayStation Classic - External.lpl" "$mountpoint/games" "/tmp/ra_playlist_thumbnails"
     mount -o bind "/tmp/ra_playlist_thumbnails" "$retroarch_path/.config/retroarch/thumbnails/PlayStation Classic - External"
     
     end=$(date +%s%N)
@@ -480,7 +500,7 @@ execute_bleemsync_func(){
   # Only launch BleemSync UI if data lines are connected or HDMI is not connected
   if [ $(cat /sys/module/musb_hdrc/parameters/charger_info) -eq "1" ] || [ `cat /sys/class/drm/card0-HDMI-A-1/status` = "disconnected" ]; then
     # Skip launching BleemSync UI if a database exists, and the user is booting directly to RA or Stock UI
-    if [ ! "$boot_command" = "launch_BootMenu" ] && [ -f "$bleemsync_path/etc/bleemsync/SYS/databases/regional.db" ]; then
+    if [ ! "$boot_command" = "launch_BootMenu" ] && [ -f "$bleemsync_path/etc/bleemsync/SYS/databases/$pb_currentdbfile" ]; then
       echo "[BLEEMSYNC](INFO) Skip startup of BleemSync UI as booting directly to $boot_command"
     else
       #This needs some serious cleaning in future revisions...
@@ -491,22 +511,22 @@ execute_bleemsync_func(){
       sleep 4
     fi
 
-    if [ ! -f "$bleemsync_path/etc/bleemsync/SYS/databases/regional.db" ]; then
+    if [ ! -f "$bleemsync_path/etc/bleemsync/SYS/databases/$pb_currentdbfile" ]; then
       echo "[BLEEMSYNC](INFO) UI database does not exist. Waiting for automatic creation during UI startup"
       sdl_text "UI database doesn't exist. Creating DB..."
       SECONDS=0
       db_timeout=45
-      while [ ! -f "$bleemsync_path/etc/bleemsync/SYS/databases/regional.db" ]
+      while [ ! -f "$bleemsync_path/etc/bleemsync/SYS/databases/$pb_currentdbfile" ]
       do
         sleep 1s
         [ $SECONDS -gt $db_timeout ] && break
       done
-      [ -f "$bleemsync_path/etc/bleemsync/SYS/databases/regional.db" ] && echo "[BLEEMSYNC](INFO) database generated in $SECONDS seconds."
+      [ -f "$bleemsync_path/etc/bleemsync/SYS/databases/$pb_currentdbfile" ] && echo "[BLEEMSYNC](INFO) database generated in $SECONDS seconds."
     fi
   fi
 
   # Check for regional database
-  if [ ! -f "$bleemsync_path/etc/bleemsync/SYS/databases/regional.db" ]; then
+  if [ ! -f "$bleemsync_path/etc/bleemsync/SYS/databases/$pb_currentdbfile" ]; then
     echo "[BLEEMSYNC](ERROR) regional database has not been created."
     #display error message
     sdl_text "Could not create regional database."
