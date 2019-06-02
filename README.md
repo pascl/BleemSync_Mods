@@ -10,9 +10,12 @@ Modified files of BleemSync which permits:
 * BleemSync 1.1 - use this mod as a base. Be sure you have run at least one your drive before modifying it [https://modmyclassic.com/bleemsync/]
 * pbPSCReAlpha (1.3+) - can generate multi DB files to split games in folders [https://github.com/pascl/pbPSCReAlpha]
 * pbImgUtils - can resize pictures and add text easily creating several files at once [https://github.com/pascl/pbImgUtils]
-* pbPSCBSLauncherGenerator - auto-generate launchers scanning folders [https://github.com/pascl/pbPSCBSLauncherGenerator]
+* COMING SOON - pbPSCBSLauncherGenerator - auto-generate launchers scanning folders [https://github.com/pascl/pbPSCBSLauncherGenerator]
 
 ### Links:
+* https://www.youtube.com/watch?v=OMapxlnn_2w
+
+---------------------------------------------
 * https://www.youtube.com/watch?v=iQ6g5x0tvdQ
 * https://www.youtube.com/watch?v=ug415HeSAkY
 * https://www.youtube.com/watch?v=pCT1Tb84IDo
