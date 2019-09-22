@@ -43,6 +43,7 @@ intercept_file_formats=(    # alternative PCSX ReARMed game formats
   "mdf"
   "toc"
   "cbn"
+  "chd"
 )
 ui_menu_pid=""
 
@@ -86,7 +87,6 @@ echo "[INTERCEPT](INFO) Starting PS Classic Intercept"
 if [ -f "/data/AppData/sony/title/launch.sh" ]; then
   echo "[INTERCEPT](INFO) launch.sh exists"
   title_path=`readlink -fn /data/AppData/sony/title/`
-  rm -f "/var/volatile/launchtmp"
   ln -sf "$title_path" "/var/volatile/launchtmp"
   echo "launch_launcher_command" > "/tmp/launchfilecommand"
   touch "/data/power/prepare_suspend"
@@ -135,6 +135,10 @@ do
 
       start_alt=$(date +%s%N)
       for f in "${intercept_file_formats[@]}"; do
+        if [ "$launch_ra_from_stock_UI" = "0" ] && [ "$f" = "m3u" ]; then
+          echo "[INTERCEPT](INFO) Ignoring m3u game format as Stock PCSX is the current emulator"
+          continue
+        fi
         f_upper=$(echo $f | tr a-z A-Z)
         if [ -f "${arg%.cue}.${f}" ]; then
           intercept_game_alternative_path="${arg%.cue}.${f}"
