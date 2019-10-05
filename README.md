@@ -10,7 +10,8 @@ Modified files of BleemSync which permits:
 * BleemSync 1.2 - use this mod as a base. Be sure you have run at least once your drive before modifying it [https://modmyclassic.com/bleemsync/]
 
 ### Links:
-- - - - -
+* Replacing internal games: https://youtu.be/IQk6d9z3b3Q
+
 
 ### How to
 #### Launch CHD files (from Stock UI)
