@@ -44,6 +44,7 @@ intercept_file_formats=(    # alternative PCSX ReARMed game formats
   "toc"
   "cbn"
   "chd"
+  "rapsc"
 )
 ui_menu_pid=""
 
@@ -181,8 +182,17 @@ done
 end_arg=$(date +%s%N)
 echo "[INTERCEPT](PROFILE) extracting arguments took: $(((end_arg-start_arg)/1000000))ms to execute"
 
-
-if [ "$launch_ra_from_stock_UI" = "1" ]; then
+if [ "$intercept_game_ext" = "rapsc" ]; then
+  end=$(date +%s%N)
+  echo "[INTERCEPT](PROFILE) up to launching RetroArch took: $(((end-start)/1000000))ms to execute"
+  echo -n 2 > /data/power/disable
+  link_ra_memory_cards
+  launch_retroarch_from_StockUI
+  exit_checkSaveState
+  resume_ui_menu
+  echo -n 1 > /data/power/disable
+  exit 0
+elif [ "$launch_ra_from_stock_UI" = "1" ]; then
   echo "[INTERCEPT](INFO) RetroArch is enabled as the emulator"
   # Swap stock multi disc game path to an .m3u for better disc swap support in RetroArch
   case "$intercept_game_id" in
